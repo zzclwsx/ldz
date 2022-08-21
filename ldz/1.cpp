@@ -5,6 +5,8 @@
 using namespace cv;
 using namespace std;
 
+string text;
+
 //计算cols列上的像素值和
 int getcolssum(Mat &src,int cols){
     int result = 0;
@@ -108,8 +110,6 @@ vector<Mat> moban(Mat img){
 Rect cutwhite(Mat img){
 	cvtColor(img,img,COLOR_BGR2GRAY);
 	threshold(img,img,155,255,THRESH_BINARY);
-	imshow("img",img);
-	waitKey(0);
 	int rvalue = getrowssum(img,0);
 	int cvalue = getcolssum(img,0);
 	int up = 0,left = 0,right = img.cols-1,down = img.rows-1;
@@ -136,14 +136,14 @@ Rect cutwhite(Mat img){
 			down--;
 		}
 	}
-	imshow("222",img(Rect(Point(left,up),Point(right,down))));
-	waitKey(0);
 	return Rect(Point(left,up),Point(right,down));
 }
 //确定roi区域，，
 Rect findroi(Mat img){
 	cvtColor(img,img,COLOR_BGR2GRAY);
 	threshold(img,img,155,255,THRESH_BINARY);
+	imshow("img",img);
+	waitKey(0);
 	int flag,lenth = 0,gray = 0,white = 0;
 	int rowidx,colsidx,maxcolsidx,max=0;
 	double rate;
@@ -183,14 +183,12 @@ Rect findroi(Mat img){
 	}
 	int value = getrowssum(img,rowidx);
 	int i = rowidx,w = 0;
-	while (value){
+	while (value>300){
 		value = getrowssum(img,i);
 		i++;
 		w++;
 	}
-	Rect rect(maxcolsidx-5,rowidx-2,max,w+2);
-	imshow("showww",img(rect));
-	waitKey(0);
+	Rect rect(maxcolsidx-5,rowidx-2,max-20,w+2);
 	return rect;
 }
 
@@ -223,7 +221,11 @@ void check(vector<Mat>moban,vector<Mat>target){
             }
         }
         cout<<"No. "<<i<<"'s result is "<<maxidx<<endl;
-        
+        char c = maxidx+'0';
+		text.push_back(c);
+		if (i!=0 && (i+1)%4 == 0)
+			for (int i = 0;i<1;i++)
+				text.push_back(' ');
         max = 0;
         maxidx = 0;
     }
@@ -234,12 +236,17 @@ int main (){
     Mat img = imread(m);
     bitwise_not(img,img);
     vector<Mat> mb = moban(img);//制作模板并且将0-9数字存放到mb变量中
-    string cardPath = "C:/Users/Lenovo/Desktop/project/credit_card_04.png";
+    string cardPath = "C:/Users/Lenovo/Desktop/project/credit_card_03.png";
     Mat card = imread(cardPath);
 	card = card(cutwhite(card)).clone();
+	imshow("card",card);
+	waitKey(0);
     Rect rect = findroi(card);
     vector<Mat> temp = moban(card(rect));
     check(mb,temp);
+	rectangle(card,rect,Scalar(0,0,255),1,8);
+	putText(card,text,rect.tl(),FONT_HERSHEY_COMPLEX,1,Scalar(0,0,255),1,8);
+	imshow("origin",card);
     waitKey(0);
     system("pause");
 }
