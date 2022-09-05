@@ -1,13 +1,3 @@
-#include<iostream>
-#include<opencv2/opencv.hpp>
-#include<vector>
-
-using namespace cv;
-using namespace std;
-
-string text;
-
-//计算cols列上的像素值和
 int getcolssum(Mat &src,int cols){
     int result = 0;
     for (int i = 0;i<src.rows;i++){
@@ -15,7 +5,7 @@ int getcolssum(Mat &src,int cols){
     }
     return result;
 }
-//计算rows行上的像素值和
+
 int getrowssum(Mat &src,int rows){
     int result = 0;
     for (int i = 0;i<src.cols;i++){
@@ -24,7 +14,6 @@ int getrowssum(Mat &src,int rows){
     return result;
 }
 
-//上下剪切图像
 int cut2(Mat &dst,Mat &result){
     int up = 0,down;
     for (int i = 0;i<dst.rows;i++){
@@ -50,7 +39,6 @@ int cut2(Mat &dst,Mat &result){
     return 0;
 }
 
-//左右剪切图像
 int cut1(Mat &src,Mat &result,Mat &rImg){
     int left = 0,right;
     int cols_value;
@@ -67,9 +55,13 @@ int cut1(Mat &src,Mat &result,Mat &rImg){
         return 1;
     }
     //右界限
+    int gray = 0;
     for (int i = left;i<src.cols;i++){
         cols_value = getcolssum(src,i);
         if (cols_value == 0){
+            gray++;
+            if (gray<2)
+                continue;
             right = i;
             break;
         }
@@ -88,16 +80,18 @@ int cut1(Mat &src,Mat &result,Mat &rImg){
     return 0;
 }
 
-//第一个在主函数中调用的函数，前面的函数为这个函数做准备。。
 vector<Mat> moban(Mat img){
     Mat result,rImg;
+    add(img,Scalar(5,5,5),img);
     cvtColor(img,img,COLOR_BGR2GRAY);
-    threshold(img,img,155,255,THRESH_BINARY);
+    threshold(img,img,150,255,THRESH_BINARY);
     int flag = cut1(img,result,rImg);
     vector<Mat> templ;
     int i = 0;
+    Mat kernal = getStructuringElement(MORPH_RECT,Size(3,3));
     while(flag == 0){
         cut1(img,result,rImg);
+        dilate(result,result,kernal);
         templ.push_back(result.clone());
         i++;
         img = rImg.clone();
@@ -109,7 +103,7 @@ vector<Mat> moban(Mat img){
 //剪切白边
 Rect cutwhite(Mat img){
 	cvtColor(img,img,COLOR_BGR2GRAY);
-	threshold(img,img,155,255,THRESH_BINARY);
+	threshold(img,img,150,255,THRESH_BINARY);
 	int rvalue = getrowssum(img,0);
 	int cvalue = getcolssum(img,0);
 	int up = 0,left = 0,right = img.cols-1,down = img.rows-1;
@@ -121,7 +115,6 @@ Rect cutwhite(Mat img){
 	cvalue = getcolssum(img,right);
 	if (cvalue>100){
 		while (getcolssum(img,right) > (cvalue-100)){
-			//cout<<"1"<<endl;
 			right--;
 		}
 	}
@@ -140,10 +133,9 @@ Rect cutwhite(Mat img){
 }
 //确定roi区域，，
 Rect findroi(Mat img){
+    subtract(img,Scalar(16,16,16),img);
 	cvtColor(img,img,COLOR_BGR2GRAY);
-	threshold(img,img,155,255,THRESH_BINARY);
-	imshow("img",img);
-	waitKey(0);
+	threshold(img,img,150,255,THRESH_BINARY);
 	int flag,lenth = 0,gray = 0,white = 0;
 	int rowidx,colsidx,maxcolsidx,max=0;
 	double rate;
@@ -184,11 +176,14 @@ Rect findroi(Mat img){
 	int value = getrowssum(img,rowidx);
 	int i = rowidx,w = 0;
 	while (value>300){
+        if (w>45)
+            break;
 		value = getrowssum(img,i);
 		i++;
 		w++;
 	}
 	Rect rect(maxcolsidx-5,rowidx-2,max-20,w+2);
+    imshow("roi",img(rect));
 	return rect;
 }
 
@@ -210,9 +205,9 @@ void check(vector<Mat>moban,vector<Mat>target){
     string ret;
     int maxidx,max = 0;
     for (int i = 0;i<target.size();i++)
-        resize(target[i],target[i],Size(8,8),0,0);
+        resize(target[i],target[i],Size(12,15),0,0);
     for (int i = 0;i<moban.size();i++)
-        resize(moban[i],moban[i],Size(8,8),0,0);
+        resize(moban[i],moban[i],Size(12,15),0,0);
     for (int i = 0;i<target.size();i++){
         for(int j = 0;j<moban.size();j++){
             if (my_compare(target[i],moban[j])>max){
@@ -221,6 +216,7 @@ void check(vector<Mat>moban,vector<Mat>target){
             }
         }
         cout<<"No. "<<i<<"'s result is "<<maxidx<<endl;
+        cout<<"max = "<<max<<endl;
         char c = maxidx+'0';
 		text.push_back(c);
 		if (i!=0 && (i+1)%4 == 0)
@@ -229,24 +225,4 @@ void check(vector<Mat>moban,vector<Mat>target){
         max = 0;
         maxidx = 0;
     }
-}
-
-int main (){
-    string m = "C:/Users/Lenovo/Desktop/project/number.png";
-    Mat img = imread(m);
-    bitwise_not(img,img);
-    vector<Mat> mb = moban(img);//制作模板并且将0-9数字存放到mb变量中
-    string cardPath = "C:/Users/Lenovo/Desktop/project/credit_card_03.png";
-    Mat card = imread(cardPath);
-	card = card(cutwhite(card)).clone();
-	imshow("card",card);
-	waitKey(0);
-    Rect rect = findroi(card);
-    vector<Mat> temp = moban(card(rect));
-    check(mb,temp);
-	rectangle(card,rect,Scalar(0,0,255),1,8);
-	putText(card,text,rect.tl(),FONT_HERSHEY_COMPLEX,1,Scalar(0,0,255),1,8);
-	imshow("origin",card);
-    waitKey(0);
-    system("pause");
 }
